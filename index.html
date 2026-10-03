@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부품 데이터베이스 관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1b2430;
+    --ink-soft:#4a5568;
+    --line:#d7dce2;
+    --line-strong:#a8b2bd;
+    --bg:#f3f5f7;
+    --panel:#ffffff;
+    --accent:#0f5c73;
+    --accent-soft:#e4eef0;
+    --warn:#a13d2b;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .frame{
+    max-width:none;
+    width:100%;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+
+  header.hdr{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  header.hdr .brand{ display:flex; align-items:center; gap:18px; }
+  header.hdr .brand-logo{ height:64px; width:auto; display:block; }
+  header.hdr h1{
+    font-size:22px;
+    font-weight:700;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  header.hdr p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+  .count-badge{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:6px 12px;
+    border-radius:3px;
+    white-space:nowrap;
+  }
+
+  .toolbar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  button{
+    font-family:var(--sans);
+    font-size:13px;
+    font-weight:600;
+    padding:9px 16px;
+    border-radius:4px;
+    border:1px solid var(--line-strong);
+    background:var(--panel);
+    color:var(--ink);
+    cursor:pointer;
+    transition:background .12s, border-color .12s;
+  }
+  button:hover{ background:#eef1f3; }
+  button.primary{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:#fff;
+  }
+  button.primary:hover{ background:#2c3846; }
+  button.accent{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  button.accent:hover{ background:#0c4c60; }
+  button.ghost{
+    background:transparent;
+    border-color:transparent;
+    color:var(--ink-soft);
+    padding:6px 8px;
+  }
+  button.ghost:hover{ color:var(--warn); }
+  input[type=file]{ display:none; }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    margin-bottom:18px;
+  }
+
+  /* search */
+  .search-panel{ padding:16px 18px; }
+  .search-panel .label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:10px;
+  }
+  .filter-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    gap:10px;
+  }
+  .filter-grid label{
+    display:block;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .filter-grid input{
+    width:100%;
+    font-family:var(--sans);
+    font-size:13px;
+    padding:7px 9px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:#fbfbfc;
+  }
+  .filter-grid input:focus{
+    outline:none;
+    border-color:var(--accent);
+    background:#fff;
+  }
+  .search-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:12px;
+  }
+  .search-panel .search-prompt,
+  .search-panel .table-wrap{
+    margin-top:16px;
+  }
+
+  .section-label{
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink);
+    margin:0 0 10px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .tab-bar{
+    display:flex;
+    gap:4px;
+    margin-bottom:14px;
+    border-bottom:2px solid var(--ink);
+  }
+  .tab-btn{
+    font-family:var(--sans);
+    font-size:14px;
+    font-weight:600;
+    padding:10px 20px;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-radius:0;
+    position:relative;
+    top:2px;
+  }
+  .tab-btn:hover{ background:#eef1f3; color:var(--ink); }
+  .tab-btn.active{
+    color:#fff;
+    background:var(--ink);
+    border-bottom:2px solid var(--ink);
+  }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* classification bar chart */
+  .chart-section{
+    margin-top:20px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+  }
+  .chart-title{
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink);
+    margin-bottom:14px;
+  }
+  .chart-bars{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    max-height:420px;
+    overflow-y:auto;
+  }
+  .chart-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:24px;
+    cursor:pointer;
+    border-radius:3px;
+  }
+  .chart-row:hover{ background:#f7f8f9; }
+  .chart-row.selected .chart-label{ color:var(--ink); font-weight:700; }
+  .chart-row.selected .chart-fill{ background:#0c4c60; }
+  .chart-label{
+    width:190px;
+    flex:0 0 190px;
+    font-size:12px;
+    color:var(--ink-soft);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    text-align:right;
+  }
+  .chart-track{
+    flex:1;
+    height:20px;
+    display:flex;
+    align-items:center;
+  }
+  .chart-fill{
+    height:20px;
+    min-width:2px;
+    background:var(--accent);
+    border-radius:0 4px 4px 0;
+    transition:background .12s;
+  }
+  .chart-row:hover .chart-fill{ background:#0c4c60; }
+  .chart-value{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .chart-empty{
+    padding:24px 0;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+  .chart-detail{
+    margin-top:16px;
+    padding-top:16px;
+    border-top:1px dashed var(--line);
+  }
+  .chart-detail-title{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:10px;
+  }
+  .chart-detail .table-wrap{ max-height:320px; }
+  .chart-tooltip{
+    position:fixed;
+    pointer-events:none;
+    background:var(--ink);
+    color:#fff;
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:4px;
+    z-index:100;
+    white-space:nowrap;
+  }
+  .chart-tooltip .val{ font-weight:700; }
+
+  .search-prompt{
+    padding:50px 20px;
+    text-align:center;
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--panel);
+  }
+  .search-prompt .big{
+    font-size:15px;
+    font-weight:600;
+    color:var(--ink);
+    margin-bottom:6px;
+  }
+  .search-prompt .small{ font-size:13px; }
+
+  /* table */
+  .table-wrap{
+    overflow-x:auto;
+    overflow-y:auto;
+    max-height:438px; /* header + 10 data rows */
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--panel);
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  thead th{
+    text-align:left;
+    font-size:11px;
+    font-weight:600;
+    color:var(--ink-soft);
+    padding:10px 12px;
+    background:#f7f8f9;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+    position:sticky;
+    top:0;
+  }
+  tbody td{
+    padding:9px 12px;
+    border-bottom:1px solid #eceff2;
+    vertical-align:top;
+    max-width:420px;
+  }
+  tbody td.mono{ font-family:var(--mono); font-size:12.5px; color:var(--ink); }
+  tbody tr:hover{ background:#f9fafb; }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.actions{ text-align:right; white-space:nowrap; }
+
+  .empty{
+    padding:60px 20px;
+    text-align:center;
+    color:var(--ink-soft);
+  }
+  .empty .big{
+    font-size:15px;
+    font-weight:600;
+    color:var(--ink);
+    margin-bottom:6px;
+  }
+  .empty .small{ font-size:13px; }
+
+  /* modal */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(20,26,32,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:#fff;
+    border-radius:8px;
+    width:100%;
+    max-width:520px;
+    max-height:85vh;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  }
+  .modal-hdr{
+    padding:18px 22px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .modal-hdr h2{ font-size:16px; margin:0; }
+  .modal-body{
+    padding:18px 22px;
+    overflow-y:auto;
+  }
+  .modal-body .field{ margin-bottom:14px; }
+  .modal-body label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  .modal-body input{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    font-size:14px;
+    font-family:var(--sans);
+  }
+  .modal-body input:focus{ outline:none; border-color:var(--accent); }
+  .modal-ftr{
+    padding:14px 22px;
+    border-top:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+  th.sortable{ cursor:pointer; user-select:none; white-space:nowrap; }
+  th.sortable:hover{ color:var(--accent); }
+  .modal.wide{ max-width:96vw; max-height:92vh; }
+  .imp-summary{ font-size:13px; line-height:1.7; margin-bottom:12px; }
+  .imp-summary b{ color:var(--accent); }
+  .imp-bulk{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .imp-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .imp-table th, .imp-table td{ padding:7px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  .imp-table th{ background:#f4f6f8; position:sticky; top:0; }
+  .imp-table tr.dup{ background:#fff8ec; }
+  .imp-badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+  .imp-badge.new{ background:#e3f4ea; color:#1f7a45; }
+  .imp-badge.dup{ background:#ffe6c7; color:#a65a00; }
+  .imp-table .imp-choice label{ display:flex; align-items:center; gap:5px; margin:0 0 4px; font-weight:500; color:var(--ink); white-space:nowrap; }
+  .imp-table .imp-choice input{ width:auto; padding:0; }
+  .imp-diff{ font-size:12px; line-height:1.55; }
+  .imp-diff .old{ color:#b3261e; text-decoration:line-through; }
+  .imp-diff .nw{ color:#1f7a45; font-weight:600; }
+  .hist-day{ margin-bottom:14px; }
+  .hist-day-hdr{ font-size:13px; font-weight:700; padding:6px 0; border-bottom:1px solid var(--line-strong); margin-bottom:6px; }
+  .hist-entry{ font-size:12.5px; margin:4px 0; }
+  .hist-entry summary{ cursor:pointer; padding:4px 0; }
+  .hist-entry ul{ margin:4px 0 8px 18px; padding:0; color:var(--ink-soft); }
+  .hist-empty{ font-size:12.5px; color:var(--ink-soft); }
+  .col-manage{
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .col-chip{
+    font-size:12px;
+    font-family:var(--mono);
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:4px 8px;
+    border-radius:3px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .col-chip button{
+    border:none;
+    background:none;
+    padding:0;
+    color:var(--accent);
+    font-weight:700;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .status-msg{
+    font-size:12px;
+    color:var(--accent);
+    margin-top:8px;
+    min-height:16px;
+  }
+  .status-msg.err{ color:var(--warn); }
+  footer.note{
+    margin-top:20px;
+    font-size:12px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <header class="hdr">
+    <div class="brand">
+      <img class="brand-logo" src="data:image/png;base64,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" alt="inalfa roof systems">
+      <div>
+      <h1>부품 데이터베이스 관리</h1>
+      <p>PART NO. · PART NAME · Part Classification Major · Part Classification Minor · Project · 장착위치 · 공법 · 재질 유형 · 재질 · FINISH 1 · FINISH 2 조건부 검색 및 엑셀 연동</p>
+      </div>
+    </div>
+    <div class="count-badge" id="countBadge">0건 로드됨</div>
+  </header>
+
+  <div class="tab-bar" id="tabBar" style="display:none;">
+    <button class="tab-btn active" id="tabBtnSearch" data-tab="search">검색창</button>
+    <button class="tab-btn" id="tabBtnManage" data-tab="manage">데이터 관리창</button>
+  </div>
+
+  <div class="panel search-panel tab-panel active" id="searchPanel" data-tab="search" style="display:none;">
+    <div class="label">조건부 검색 (여러 항목 동시 입력 시 AND 조건으로 적용됩니다)</div>
+    <div class="filter-grid" id="filterGrid"></div>
+    <div class="search-actions">
+      <button class="ghost" id="btnResetFilter">초기화</button>
+      <button class="primary" id="btnSearch">검색</button>
+    </div>
+
+    <div class="search-prompt" id="searchPrompt">
+      <div class="big">검색 버튼을 눌러 데이터를 확인하세요</div>
+      <div class="small">조건을 입력(또는 비워둔 채) 후 [검색] 버튼을 클릭하면 데이터가 표시됩니다.</div>
+    </div>
+
+    <div class="table-wrap" id="tableWrap" style="display:none;">
+      <table id="dataTable" style="display:none;">
+        <thead><tr id="theadRow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="emptyState">
+        <div class="big">등록된 데이터가 없습니다</div>
+        <div class="small">[데이터 추가 양식]을 내려받아 작성한 뒤 엑셀 불러오기로 등록하세요.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel tab-panel" id="managePanel" data-tab="manage" style="padding:16px 18px;">
+    <div class="label" style="margin-bottom:10px;">데이터 관리 (불러오기 / 내보내기 / 추가 / 항목 관리 / 삭제)</div>
+    <div class="toolbar">
+      <button class="primary" id="btnImport">엑셀 불러오기</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <button class="accent" id="btnExport">엑셀로 내보내기</button>
+      <button id="btnTemplate">데이터 추가 양식</button>
+      <button id="btnColumns">항목 관리</button>
+      <button id="btnClear">전체 삭제</button>
+    </div>
+
+    <div class="chart-section" id="chartSection">
+      <div class="chart-title">Part Classification Major 건수 분포</div>
+      <div class="chart-bars" id="chartBars"></div>
+      <div class="chart-detail" id="chartDetail" style="display:none;"></div>
+    </div>
+
+    <div class="chart-section" id="historySection">
+      <div class="chart-title">데이터 등록 이력 (날짜별)</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div class="chart-tooltip" id="chartTooltip" style="display:none;"></div>
+
+  <div id="datalists" style="display:none;"></div>
+
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2 id="modalTitle">데이터 추가</h2>
+      <button class="ghost" id="btnCloseModal" style="font-size:20px;">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-ftr">
+      <span></span>
+      <div style="display:flex; gap:8px;">
+        <button id="btnCancelModal">취소</button>
+        <button class="primary" id="btnSaveModal">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import Preview Modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal wide">
+    <div class="modal-hdr">
+      <h2>엑셀 불러오기 확인</h2>
+      <button class="ghost" id="btnCloseImport" style="font-size:20px;">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="imp-summary" id="impSummary"></div>
+      <div class="imp-bulk" id="impBulk">
+        <button id="btnKeepAll">중복 전체 기존 유지</button>
+        <button id="btnReplaceAll">중복 전체 파일 값으로 교체</button>
+      </div>
+      <div class="table-wrap" style="max-height:50vh; overflow:auto;">
+        <table class="imp-table">
+          <thead><tr><th>상태</th><th>PART NO.</th><th>PART NAME</th><th>중복 시 선택 / 변경 내용</th></tr></thead>
+          <tbody id="impBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <span class="status-msg" id="impFooterMsg"></span>
+      <div style="display:flex; gap:8px;">
+        <button id="btnCancelImport">취소</button>
+        <button class="primary" id="btnConfirmImport">등록</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Column Manage Modal -->
+<div class="overlay" id="colOverlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>항목(열) 관리</h2>
+      <button class="ghost" id="btnCloseColModal" style="font-size:20px;">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>현재 항목</label>
+        <div class="col-manage" id="colChips"></div>
+      </div>
+      <div class="field">
+        <label>새 항목 추가</label>
+        <input type="text" id="newColInput" placeholder="예: 공급업체, 규격, 단중(kg)">
+      </div>
+      <div class="status-msg" id="colStatus"></div>
+    </div>
+    <div class="modal-ftr">
+      <span></span>
+      <button class="primary" id="btnAddCol">항목 추가</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'parts-db-v1';
+  const DEFAULT_COLUMNS = ['PART NO.','PART NAME','Part Classification Major','Part Classification Minor','Project','장착위치','공법','재질 유형','재질','표면처리 여부','FINISH 1','FINISH 2'];
+
+  const SEED_DATA = [
+    {'PART NO.':'50013128','PART NAME':'SLIDE SHOE ROLLO A','Part Classification Major':'SLIDE SHOE','장착위치':'내장','공법':'사출','재질 유형':'플라스틱','재질':'POM-009 TYPE E-1 (MS237-09)','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015697','PART NAME':'ROLLO CASSETTE LOWER','Part Classification Major':'ROLLO CASSETTE','장착위치':'내장','공법':'프레스','재질 유형':'금속','재질':'SPCC t1.2 (MS 121-04)','FINISH 1':'Coating','FINISH 2':'FPI-4'},
+    {'PART NO.':'50015698','PART NAME':'MOTOR PLATE ASSY','Part Classification Major':'MOTOR PLATE','장착위치':'내장','공법':'사출','재질 유형':'플라스틱','재질':'PP-GF45','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015710','PART NAME':'FRONT REINFORCEMENT','Part Classification Major':'REINFORCEMENT','장착위치':'내장','공법':'프레스','재질 유형':'금속','재질':'SPRC340 t1.6 (MS121-65)','FINISH 1':'Coating','FINISH 2':'FPI-4'},
+    {'PART NO.':'50015711','PART NAME':'REAR REINFORCEMENT','Part Classification Major':'REINFORCEMENT','장착위치':'내장','공법':'프레스','재질 유형':'금속','재질':'SPRC340 t1.6 (MS121-65)','FINISH 1':'Coating','FINISH 2':'FPI-4'},
+    {'PART NO.':'50015712','PART NAME':'SIDE REINFORCEMENT LH','Part Classification Major':'REINFORCEMENT','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGARC 340, P60/P60 T 1.2 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-B'},
+    {'PART NO.':'50015713','PART NAME':'SIDE REINFORCEMENT RH','Part Classification Major':'REINFORCEMENT','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGARC 340, P60/P60 T 1.2 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-B'},
+    {'PART NO.':'50015722','PART NAME':'SIDE MOLDING ASSY LH','Part Classification Major':'SIDE MOLDING','장착위치':'외장','공법':'사출','재질 유형':'플라스틱','재질':'PA6+ABS-(GF20+MD20)001 TYPE F (MS212-01)','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015723','PART NAME':'SIDE MOLDING ASSY RH','Part Classification Major':'SIDE MOLDING','장착위치':'외장','공법':'사출','재질 유형':'플라스틱','재질':'PA6+ABS-(GF20+MD20)001 TYPE F (MS212-01)','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015726','PART NAME':'WIND DEFLECTOR LOWER ROD COVER','Part Classification Major':'WIND DEFLECTOR LOWER ROD COVER','장착위치':'내장','공법':'사출','재질 유형':'플라스틱','재질':'PP-GF-45-050 (MS 213-50)','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015729','PART NAME':'MIDDLE COVER ASSY','Part Classification Major':'MIDDLE COVER','장착위치':'내장','공법':'사출','재질 유형':'플라스틱','재질':'PP-GF-45-050 (MS 213-50)','FINISH 1':'','FINISH 2':''},
+    {'PART NO.':'50015780','PART NAME':'FRONT SIDE BRACKET LH','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGAFC 590 P60/P60 T 1.4 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015781','PART NAME':'FRONT SIDE BRACKET RH','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGAFC 590 P60/P60 T 1.4 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015782','PART NAME':'CENTER CROSS MEMBER','Part Classification Major':'CENTER CROSS MEMBER','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SPFC 590 (MS121-64), T1.8','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015783','PART NAME':'SIDE MOLDING BRACKET','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SPCC t1.2 (MS 121-04)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015788','PART NAME':'SIDE BRACKET ASSY LH','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGAFC 590 P60/P60 T 1.6 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015790','PART NAME':'SIDE BRACKET ASSY RH','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGAFC 590 P60/P60 T 1.6 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015792','PART NAME':'SIDE BRACKET REAR SUPPORT PANEL ASSY','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGAFC 590 P60/P60 T 1.2 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015980','PART NAME':'COVER FRONT FRAME ASSY','Part Classification Major':'FRAME','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SPCC t0.8 (MS 121-04)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50015981','PART NAME':'FRAME SUB ASSY','Part Classification Major':'FRAME','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SGARC 340 P60/P60 T 1.0 (MS 121-79)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50016005','PART NAME':'ROLLO CASSETTE UPPER','Part Classification Major':'ROLLO CASSETTE','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SPCC t1.0 (MS 121-04)','FINISH 1':'Coating','FINISH 2':'FPO-6'},
+    {'PART NO.':'50016385','PART NAME':'SIDE MOLDING BRACKET REAR LH','Part Classification Major':'BRACKET','장착위치':'외장','공법':'프레스','재질 유형':'금속','재질':'SPCC t1.2 (MS 121-04)','FINISH 1':'Coating','FINISH 2':'FPO-6'}
+  ];
+
+  let columns = DEFAULT_COLUMNS.slice();
+  let rows = []; // array of objects keyed by column name, plus _id
+  let nextId = 1;
+
+  const el = id => document.getElementById(id);
+  const tbody = el('tbody');
+  const theadRow = el('theadRow');
+  const dataTable = el('dataTable');
+  const emptyState = el('emptyState');
+  const countBadge = el('countBadge');
+  const filterGrid = el('filterGrid');
+  const tabBar = el('tabBar');
+  const tabBtnSearch = el('tabBtnSearch');
+  const tabBtnManage = el('tabBtnManage');
+  const searchPanel = el('searchPanel');
+  const managePanel = el('managePanel');
+  const searchPrompt = el('searchPrompt');
+  const tableWrap = el('tableWrap');
+
+  function switchTab(tab){
+    tabBtnSearch.classList.toggle('active', tab === 'search');
+    tabBtnManage.classList.toggle('active', tab === 'manage');
+    searchPanel.classList.toggle('active', tab === 'search');
+    managePanel.classList.toggle('active', tab === 'manage');
+  }
+  tabBtnSearch.addEventListener('click', ()=> switchTab('search'));
+  tabBtnManage.addEventListener('click', ()=> switchTab('manage'));
+
+  let filters = {}; // column -> string
+  let hasSearched = false;
+
+  const SELECT_COLUMNS = ['Part Classification Major','Part Classification Minor','Project','장착위치','공법','재질 유형','표면처리 여부','FINISH 1'];
+  const MAJOR_COL = 'Part Classification Major';
+  const MINOR_COL = 'Part Classification Minor';
+  function datalistId(col){ return 'dl_' + SELECT_COLUMNS.indexOf(col); }
+
+  // Minor 후보는 선택(입력)된 Major에 속한 값만 보여준다. Major가 비어 있으면 전체.
+  function updateMinorList(major){
+    const dl = el(datalistId(MINOR_COL));
+    if(!dl) return;
+    const m = (major || '').toString().trim().toLowerCase();
+    const values = Array.from(new Set(
+      rows.filter(r => m === '' || (r[MAJOR_COL] || '').toString().toLowerCase().includes(m))
+          .map(r => (r[MINOR_COL] || '').toString().trim())
+          .filter(v => v !== '')
+    )).sort((a,b)=> a.localeCompare(b, 'ko'));
+    dl.innerHTML = '';
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      dl.appendChild(opt);
+    });
+  }
+
+  function renderDatalists(){
+    const container = el('datalists');
+    container.innerHTML = '';
+    SELECT_COLUMNS.forEach(col => {
+      if(!columns.includes(col)) return;
+      const values = Array.from(new Set(
+        rows.map(r => (r[col] || '').toString().trim()).filter(v => v !== '')
+      )).sort((a,b)=> a.localeCompare(b, 'ko'));
+      const dl = document.createElement('datalist');
+      dl.id = datalistId(col);
+      values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        dl.appendChild(opt);
+      });
+      container.appendChild(dl);
+    });
+    updateMinorList(filters[MAJOR_COL]);
+  }
+
+  function loadFromStorage(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        columns = parsed.columns && parsed.columns.length ? parsed.columns : DEFAULT_COLUMNS.slice();
+        rows = parsed.rows || [];
+        nextId = parsed.nextId || (rows.length + 1);
+        // 마이그레이션: PART CLASSIFICATION -> Part Classification Major, Minor/Project 열 추가
+        const OLD_CLS = 'PART CLASSIFICATION', MAJOR = 'Part Classification Major';
+        let migrated = false;
+        if(columns.includes(OLD_CLS)){
+          columns = columns.map(c => c === OLD_CLS ? MAJOR : c);
+          rows.forEach(r => { if(OLD_CLS in r){ r[MAJOR] = r[OLD_CLS]; delete r[OLD_CLS]; } });
+          migrated = true;
+        }
+        ['Part Classification Minor','Project'].forEach(name => {
+          if(columns.includes(name)) return;
+          const prev = name === 'Project' ? 'Part Classification Minor' : MAJOR;
+          const idx = columns.indexOf(prev);
+          columns.splice(idx === -1 ? columns.length : idx + 1, 0, name);
+          rows.forEach(r => { r[name] = r[name] || ''; });
+          migrated = true;
+        });
+        if(migrated) saveToStorage();
+        if(!columns.includes('표면처리 여부')){
+          const finish1Idx = columns.indexOf('FINISH 1');
+          const insertAt = finish1Idx === -1 ? columns.length : finish1Idx;
+          columns.splice(insertAt, 0, '표면처리 여부');
+          rows.forEach(r => { r['표면처리 여부'] = r['표면처리 여부'] || ''; });
+          saveToStorage();
+        }
+      } else {
+        seedInitialData();
+      }
+    }catch(e){
+      // no existing data yet - start from the reference sheet data
+      seedInitialData();
+    }
+    render();
+  }
+
+  function seedInitialData(){
+    columns = DEFAULT_COLUMNS.slice();
+    rows = SEED_DATA.map(obj => {
+      const rec = {_id: nextId++};
+      columns.forEach(c => rec[c] = obj[c] !== undefined ? obj[c] : '');
+      return rec;
+    });
+    saveToStorage();
+  }
+
+  function saveToStorage(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({columns, rows, nextId}));
+    }catch(e){
+      console.error('저장 실패', e);
+    }
+  }
+
+  const CHART_COLUMN = 'Part Classification Major';
+  let selectedClassification = null;
+
+  function renderClassificationChart(){
+    const chartBars = el('chartBars');
+    const chartDetail = el('chartDetail');
+    const tooltip = el('chartTooltip');
+
+    if(!columns.includes(CHART_COLUMN)){
+      chartBars.innerHTML = '';
+      const msg = document.createElement('div');
+      msg.className = 'chart-empty';
+      msg.textContent = '"' + CHART_COLUMN + '" 항목이 없어 그래프를 표시할 수 없습니다.';
+      chartBars.appendChild(msg);
+      selectedClassification = null;
+      chartDetail.style.display = 'none';
+      chartDetail.innerHTML = '';
+      return;
+    }
+
+    const counts = new Map();
+    rows.forEach(r => {
+      const v = (r[CHART_COLUMN] || '').toString().trim();
+      const key = v === '' ? '(미지정)' : v;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    chartBars.innerHTML = '';
+    if(counts.size === 0){
+      const msg = document.createElement('div');
+      msg.className = 'chart-empty';
+      msg.textContent = '표시할 데이터가 없습니다.';
+      chartBars.appendChild(msg);
+      selectedClassification = null;
+      chartDetail.style.display = 'none';
+      chartDetail.innerHTML = '';
+      return;
+    }
+
+    if(selectedClassification !== null && !counts.has(selectedClassification)){
+      selectedClassification = null;
+    }
+
+    const entries = Array.from(counts.entries()).sort((a,b)=> b[1] - a[1]);
+    const max = Math.max(...entries.map(e => e[1]));
+
+    entries.forEach(([label, count]) => {
+      const row = document.createElement('div');
+      row.className = 'chart-row' + (label === selectedClassification ? ' selected' : '');
+
+      const labelEl = document.createElement('div');
+      labelEl.className = 'chart-label';
+      labelEl.textContent = label;
+      labelEl.title = label;
+
+      const track = document.createElement('div');
+      track.className = 'chart-track';
+      const fill = document.createElement('div');
+      fill.className = 'chart-fill';
+      fill.style.width = Math.max(1, (count / max * 100)) + '%';
+      track.appendChild(fill);
+
+      const valueEl = document.createElement('div');
+      valueEl.className = 'chart-value';
+      valueEl.textContent = count + '건';
+
+      row.appendChild(labelEl);
+      row.appendChild(track);
+      row.appendChild(valueEl);
+
+      row.addEventListener('click', ()=>{
+        selectedClassification = (selectedClassification === label) ? null : label;
+        renderClassificationChart();
+      });
+
+      row.addEventListener('mouseenter', ()=>{
+        tooltip.style.display = 'block';
+        tooltip.innerHTML = '';
+        tooltip.appendChild(document.createTextNode(label + ' — '));
+        const valSpan = document.createElement('span');
+        valSpan.className = 'val';
+        valSpan.textContent = count + '건';
+        tooltip.appendChild(valSpan);
+      });
+      row.addEventListener('mousemove', (e)=>{
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+      });
+      row.addEventListener('mouseleave', ()=>{
+        tooltip.style.display = 'none';
+      });
+
+      chartBars.appendChild(row);
+    });
+
+    renderChartDetail();
+  }
+
+  function renderChartDetail(){
+    const chartDetail = el('chartDetail');
+    chartDetail.innerHTML = '';
+
+    if(selectedClassification === null){
+      chartDetail.style.display = 'none';
+      return;
+    }
+
+    const matched = rows.filter(r => {
+      const v = (r[CHART_COLUMN] || '').toString().trim();
+      const key = v === '' ? '(미지정)' : v;
+      return key === selectedClassification;
+    });
+
+    const title = document.createElement('div');
+    title.className = 'chart-detail-title';
+    title.textContent = selectedClassification + ' 상세 데이터 (' + matched.length + '건)';
+    chartDetail.appendChild(title);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const theadTr = document.createElement('tr');
+    columns.forEach(col => {
+      const th = document.createElement('th');
+      th.textContent = col;
+      theadTr.appendChild(th);
+    });
+    const thActions = document.createElement('th');
+    thActions.textContent = '관리';
+    theadTr.appendChild(thActions);
+    thead.appendChild(theadTr);
+    table.appendChild(thead);
+
+    const tbodyEl = document.createElement('tbody');
+    matched.forEach(r => {
+      const tr = document.createElement('tr');
+      columns.forEach((col, i) => {
+        const td = document.createElement('td');
+        if(i === 0) td.className = 'mono';
+        td.textContent = r[col] || '';
+        tr.appendChild(td);
+      });
+      const tdA = document.createElement('td');
+      tdA.className = 'actions';
+      const editBtn = document.createElement('button');
+      editBtn.className = 'ghost';
+      editBtn.textContent = '수정';
+      editBtn.style.fontSize = '12px';
+      editBtn.addEventListener('click', ()=> openEditModal(r._id));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'ghost';
+      delBtn.textContent = '삭제';
+      delBtn.style.fontSize = '12px';
+      delBtn.addEventListener('click', ()=> deleteRow(r._id));
+      tdA.appendChild(editBtn);
+      tdA.appendChild(delBtn);
+      tr.appendChild(tdA);
+      tbodyEl.appendChild(tr);
+    });
+    table.appendChild(tbodyEl);
+    wrap.appendChild(table);
+    chartDetail.appendChild(wrap);
+    chartDetail.style.display = 'block';
+  }
+
+  function render(){
+    renderDatalists();
+    renderFilterInputs();
+    renderClassificationChart();
+    renderHistory();
+    updateDisplay();
+    const hasCols = columns.length > 0;
+    tabBar.style.display = hasCols ? 'flex' : 'none';
+    searchPanel.style.display = hasCols ? '' : 'none';
+    managePanel.style.display = hasCols ? '' : 'none';
+  }
+
+  function updateDisplay(){
+    if(!hasSearched){
+      searchPrompt.style.display = 'block';
+      tableWrap.style.display = 'none';
+      countBadge.textContent = rows.length + '건 로드됨';
+    } else {
+      searchPrompt.style.display = 'none';
+      tableWrap.style.display = 'block';
+      renderTable();
+    }
+  }
+
+  function renderFilterInputs(){
+    filterGrid.innerHTML = '';
+    columns.forEach(col => {
+      const wrap = document.createElement('div');
+      if(col === '공법') wrap.style.gridColumnStart = '1'; // 공법부터 다음 줄에 배치
+      const label = document.createElement('label');
+      label.textContent = col;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = filters[col] || '';
+      input.placeholder = col + ' 검색';
+      if(SELECT_COLUMNS.includes(col)){
+        input.setAttribute('list', datalistId(col));
+      }
+      input.addEventListener('input', (e)=>{
+        filters[col] = e.target.value;
+        if(col === MAJOR_COL) updateMinorList(e.target.value);
+        if(hasSearched) renderTable();
+      });
+      input.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' && !e.isComposing) el('btnSearch').click();
+      });
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      filterGrid.appendChild(wrap);
+    });
+  }
+
+  function getFilteredRows(){
+    const activeFilters = Object.entries(filters).filter(([k,v]) => v && v.trim() !== '');
+    if(activeFilters.length === 0) return rows;
+    return rows.filter(r => {
+      return activeFilters.every(([col, val]) => {
+        const cell = (r[col] || '').toString().toLowerCase();
+        return cell.includes(val.toLowerCase());
+      });
+    });
+  }
+
+  let sortCol = null;
+  let sortDir = 'asc';
+
+  function renderTable(){
+    let filtered = getFilteredRows();
+    if(sortCol !== null && columns.includes(sortCol)){
+      const dir = sortDir === 'asc' ? 1 : -1;
+      filtered = filtered.slice().sort((a, b) => {
+        const x = (a[sortCol] || '').toString().trim();
+        const y = (b[sortCol] || '').toString().trim();
+        if(x === '' && y !== '') return 1;   // 빈 값은 항상 뒤로
+        if(y === '' && x !== '') return -1;
+        return x.localeCompare(y, 'ko', {numeric: true, sensitivity: 'base'}) * dir;
+      });
+    }
+
+    theadRow.innerHTML = '';
+    columns.forEach(col => {
+      const th = document.createElement('th');
+      th.className = 'sortable';
+      th.title = '클릭하여 정렬 (오름차순 → 내림차순 → 해제)';
+      th.textContent = col + (col === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+      th.addEventListener('click', ()=>{
+        if(sortCol !== col){ sortCol = col; sortDir = 'asc'; }
+        else if(sortDir === 'asc'){ sortDir = 'desc'; }
+        else { sortCol = null; sortDir = 'asc'; }
+        renderTable();
+      });
+      theadRow.appendChild(th);
+    });
+    const thActions = document.createElement('th');
+    thActions.textContent = '관리';
+    theadRow.appendChild(thActions);
+
+    tbody.innerHTML = '';
+    filtered.forEach(r => {
+      const tr = document.createElement('tr');
+      columns.forEach((col, i) => {
+        const td = document.createElement('td');
+        if(i === 0) td.className = 'mono';
+        td.textContent = r[col] || '';
+        tr.appendChild(td);
+      });
+      const tdA = document.createElement('td');
+      tdA.className = 'actions';
+      const editBtn = document.createElement('button');
+      editBtn.className = 'ghost';
+      editBtn.textContent = '수정';
+      editBtn.style.fontSize = '12px';
+      editBtn.addEventListener('click', ()=> openEditModal(r._id));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'ghost';
+      delBtn.textContent = '삭제';
+      delBtn.style.fontSize = '12px';
+      delBtn.addEventListener('click', ()=> deleteRow(r._id));
+      tdA.appendChild(editBtn);
+      tdA.appendChild(delBtn);
+      tr.appendChild(tdA);
+      tbody.appendChild(tr);
+    });
+
+    if(filtered.length === 0){
+      dataTable.style.display = 'none';
+      emptyState.style.display = 'block';
+      if(rows.length > 0){
+        emptyState.querySelector('.big').textContent = '검색 결과가 없습니다';
+        emptyState.querySelector('.small').textContent = '검색 조건을 초기화하거나 다른 값을 입력해 보세요.';
+      } else {
+        emptyState.querySelector('.big').textContent = '등록된 데이터가 없습니다';
+        emptyState.querySelector('.small').textContent = '[데이터 추가 양식]을 내려받아 작성한 뒤 엑셀 불러오기로 등록하세요.';
+      }
+    } else {
+      dataTable.style.display = 'table';
+      emptyState.style.display = 'none';
+    }
+
+    countBadge.textContent = (filtered.length !== rows.length)
+      ? filtered.length + ' / ' + rows.length + '건 표시'
+      : rows.length + '건 로드됨';
+  }
+
+  function deleteRow(id){
+    if(!confirm('이 데이터를 삭제하시겠습니까?')) return;
+    rows = rows.filter(r => r._id !== id);
+    saveToStorage();
+    updateDisplay();
+  }
+
+  el('btnClear').addEventListener('click', ()=>{
+    if(rows.length === 0) return;
+    if(!confirm('전체 ' + rows.length + '건의 데이터를 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+    rows = [];
+    saveToStorage();
+    render();
+  });
+
+  el('btnResetFilter').addEventListener('click', ()=>{
+    filters = {};
+    hasSearched = false;
+    renderFilterInputs();
+    updateDisplay();
+  });
+
+  el('btnSearch').addEventListener('click', ()=>{
+    hasSearched = true;
+    updateDisplay();
+  });
+
+  // ---- Import ----
+  el('btnImport').addEventListener('click', ()=> el('fileInput').click());
+  el('fileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt)=>{
+      try{
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        if(json.length === 0){
+          alert('불러올 데이터가 없습니다. 첫 행에 항목명(헤더)이 있는지 확인해 주세요.');
+          return;
+        }
+        if(!columns.includes('PART NO.')){
+          alert('"PART NO." 항목이 없어 품번 기준으로 불러올 수 없습니다. 항목 관리에서 PART NO.를 먼저 추가해 주세요.');
+          return;
+        }
+
+        // 검색창에 정의된 항목(columns) 외의 열은 무시하고,
+        // 품번(PART NO.)이 중복되면 마지막 행을 기준으로 덮어쓴다.
+        const byPartNo = new Map();
+        let skipped = 0;
+        json.forEach(obj => {
+          const partNo = (obj['PART NO.'] !== undefined ? String(obj['PART NO.']) : '').trim();
+          if(partNo === ''){ skipped++; return; }
+          const rec = {};
+          columns.forEach(c => rec[c] = obj[c] !== undefined ? String(obj[c]) : '');
+          // 이전 헤더명(PART CLASSIFICATION)도 Major 열로 인식
+          if(obj['Part Classification Major'] === undefined && obj['PART CLASSIFICATION'] !== undefined && columns.includes('Part Classification Major')){
+            rec['Part Classification Major'] = String(obj['PART CLASSIFICATION']);
+          }
+          byPartNo.set(partNo, rec);
+        });
+
+        // 품번 기준으로 기존 데이터와 비교해 미리보기 창을 띄운다 (등록은 확인 후 진행)
+        const items = [];
+        byPartNo.forEach((rec, partNo) => {
+          const existing = rows.find(r => (r['PART NO.'] || '').toString().trim() === partNo);
+          const item = {partNo, rec, existingId: null, diffs: [], choice: 'keep'};
+          if(existing){
+            item.existingId = existing._id;
+            item.existing = existing;
+            columns.forEach(c => {
+              const a = (existing[c] || '').toString().trim();
+              const b = (rec[c] || '').toString().trim();
+              if(a !== b) item.diffs.push({col: c, oldV: a, newV: b});
+            });
+          }
+          items.push(item);
+        });
+        openImportPreview(file.name, items, skipped, json.length - skipped - byPartNo.size);
+      }catch(err){
+        alert('파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+      }
+      el('fileInput').value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ---- Import preview ----
+  const importOverlay = el('importOverlay');
+  const impBody = el('impBody');
+  let pendingImport = null;
+
+  function openImportPreview(fileName, items, skipped, inFileDup){
+    pendingImport = {fileName, items};
+    const newCnt = items.filter(i => i.existingId === null).length;
+    const dupCnt = items.length - newCnt;
+    const sum = el('impSummary');
+    sum.innerHTML = '';
+    const lines = [
+      '파일: ' + fileName,
+      '신규 등록 가능 <b>' + newCnt + '</b>건 / 기존 품번과 중복 <b>' + dupCnt + '</b>건',
+      '중복 품번은 신규로 등록할 수 없으며, 기존 데이터를 유지할지 파일 값으로 교체할지 선택해야 합니다. (기본: 기존 유지)'
+    ];
+    if(skipped > 0) lines.push('PART NO.가 비어 있어 제외된 행: ' + skipped + '건');
+    if(inFileDup > 0) lines.push('파일 안에서 품번이 중복되어 마지막 행만 사용: ' + inFileDup + '건');
+    lines.forEach(t => {
+      const d = document.createElement('div');
+      d.innerHTML = t;
+      sum.appendChild(d);
+    });
+    el('impBulk').style.display = dupCnt > 0 ? 'flex' : 'none';
+
+    impBody.innerHTML = '';
+    items.forEach((item, idx) => {
+      const isDup = item.existingId !== null;
+      const tr = document.createElement('tr');
+      if(isDup) tr.className = 'dup';
+
+      const tdS = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'imp-badge ' + (isDup ? 'dup' : 'new');
+      badge.textContent = isDup ? '중복' : '신규';
+      tdS.appendChild(badge);
+
+      const tdNo = document.createElement('td');
+      tdNo.className = 'mono';
+      tdNo.textContent = item.partNo;
+
+      const tdName = document.createElement('td');
+      tdName.textContent = item.rec['PART NAME'] || '';
+
+      const tdC = document.createElement('td');
+      if(!isDup){
+        tdC.textContent = '신규로 등록됩니다.';
+      } else {
+        const choice = document.createElement('div');
+        choice.className = 'imp-choice';
+        [['keep','기존 데이터 유지'],['replace','파일 값으로 교체']].forEach(([val, text]) => {
+          const lab = document.createElement('label');
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'imp_choice_' + idx;
+          radio.value = val;
+          radio.checked = item.choice === val;
+          radio.addEventListener('change', ()=>{ item.choice = val; });
+          lab.appendChild(radio);
+          lab.appendChild(document.createTextNode(text));
+          choice.appendChild(lab);
+        });
+        tdC.appendChild(choice);
+
+        const diff = document.createElement('div');
+        diff.className = 'imp-diff';
+        if(item.diffs.length === 0){
+          diff.textContent = '변경 내용 없음 (기존과 동일)';
+        } else {
+          item.diffs.forEach(d => {
+            const line = document.createElement('div');
+            line.appendChild(document.createTextNode(d.col + ': '));
+            const o = document.createElement('span');
+            o.className = 'old';
+            o.textContent = d.oldV === '' ? '(빈 값)' : d.oldV;
+            const n = document.createElement('span');
+            n.className = 'nw';
+            n.textContent = d.newV === '' ? '(빈 값)' : d.newV;
+            line.appendChild(o);
+            line.appendChild(document.createTextNode(' → '));
+            line.appendChild(n);
+            diff.appendChild(line);
+          });
+        }
+        tdC.appendChild(diff);
+      }
+
+      tr.appendChild(tdS);
+      tr.appendChild(tdNo);
+      tr.appendChild(tdName);
+      tr.appendChild(tdC);
+      impBody.appendChild(tr);
+    });
+
+    el('impFooterMsg').textContent = '';
+    importOverlay.classList.add('show');
+  }
+
+  function setAllChoices(val){
+    if(!pendingImport) return;
+    pendingImport.items.forEach(i => { if(i.existingId !== null) i.choice = val; });
+    impBody.querySelectorAll('input[type=radio]').forEach(r => { r.checked = (r.value === val); });
+  }
+  el('btnKeepAll').addEventListener('click', ()=> setAllChoices('keep'));
+  el('btnReplaceAll').addEventListener('click', ()=> setAllChoices('replace'));
+
+  function closeImportPreview(){
+    importOverlay.classList.remove('show');
+    pendingImport = null;
+  }
+  el('btnCloseImport').addEventListener('click', closeImportPreview);
+  el('btnCancelImport').addEventListener('click', closeImportPreview);
+
+  el('btnConfirmImport').addEventListener('click', ()=>{
+    if(!pendingImport) return;
+    const added = [], replaced = [];
+    let kept = 0;
+    pendingImport.items.forEach(item => {
+      const brief = {partNo: item.partNo, partName: item.rec['PART NAME'] || ''};
+      if(item.existingId === null){
+        const rec = Object.assign({_id: nextId++}, item.rec);
+        rows.push(rec);
+        added.push(brief);
+      } else if(item.choice === 'replace'){
+        const idx = rows.findIndex(r => r._id === item.existingId);
+        if(idx > -1){
+          rows[idx] = Object.assign({_id: item.existingId}, item.rec);
+          replaced.push(brief);
+        }
+      } else {
+        kept++;
+      }
+    });
+
+    if(added.length === 0 && replaced.length === 0){
+      if(!confirm('등록되는 데이터가 없습니다 (신규 0건, 교체 0건). 창을 닫을까요?')) return;
+      closeImportPreview();
+      return;
+    }
+
+    addHistory({source: '엑셀 불러오기', fileName: pendingImport.fileName, added, replaced, kept});
+    saveToStorage();
+    render();
+    const msg = '등록 완료: 신규 ' + added.length + '건, 교체 ' + replaced.length + '건, 기존 유지 ' + kept + '건';
+    closeImportPreview();
+    alert(msg);
+  });
+
+  // ---- Registration history (date-wise) ----
+  const HISTORY_KEY = 'parts-db-v1-history';
+  let history = [];
+
+  function loadHistory(){
+    try{
+      const raw = localStorage.getItem(HISTORY_KEY);
+      history = raw ? (JSON.parse(raw) || []) : [];
+    }catch(e){
+      history = [];
+    }
+  }
+
+  function addHistory(entry){
+    entry.ts = new Date().toISOString();
+    history.push(entry);
+    if(history.length > 500) history = history.slice(-500);
+    try{
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }catch(e){
+      console.error('이력 저장 실패', e);
+    }
+  }
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function localDateStr(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+
+  function renderHistory(){
+    const box = el('historyList');
+    box.innerHTML = '';
+    if(history.length === 0){
+      const e = document.createElement('div');
+      e.className = 'hist-empty';
+      e.textContent = '아직 등록 이력이 없습니다.';
+      box.appendChild(e);
+      return;
+    }
+    const byDay = new Map();
+    history.slice().reverse().forEach(h => {
+      const d = new Date(h.ts);
+      const key = localDateStr(d);
+      if(!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push({h, d});
+    });
+    byDay.forEach((list, day) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'hist-day';
+      const totalAdded = list.reduce((s, x) => s + x.h.added.length, 0);
+      const totalReplaced = list.reduce((s, x) => s + x.h.replaced.length, 0);
+      const hdr = document.createElement('div');
+      hdr.className = 'hist-day-hdr';
+      hdr.textContent = day + ' — 신규 ' + totalAdded + '건' + (totalReplaced ? ', 교체 ' + totalReplaced + '건' : '');
+      wrap.appendChild(hdr);
+
+      list.forEach(({h, d}) => {
+        const det = document.createElement('details');
+        det.className = 'hist-entry';
+        const sm = document.createElement('summary');
+        let text = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ' · ' + h.source;
+        if(h.fileName) text += ' (' + h.fileName + ')';
+        text += ' · 신규 ' + h.added.length + '건';
+        if(h.replaced.length) text += ' · 교체 ' + h.replaced.length + '건';
+        if(h.kept) text += ' · 기존 유지 ' + h.kept + '건';
+        sm.textContent = text;
+        det.appendChild(sm);
+
+        const ul = document.createElement('ul');
+        h.added.forEach(p => {
+          const li = document.createElement('li');
+          li.textContent = '[신규] ' + p.partNo + (p.partName ? ' · ' + p.partName : '');
+          ul.appendChild(li);
+        });
+        h.replaced.forEach(p => {
+          const li = document.createElement('li');
+          li.textContent = '[교체] ' + p.partNo + (p.partName ? ' · ' + p.partName : '');
+          ul.appendChild(li);
+        });
+        det.appendChild(ul);
+        wrap.appendChild(det);
+      });
+      box.appendChild(wrap);
+    });
+  }
+
+  // ---- Export ----
+  el('btnExport').addEventListener('click', ()=>{
+    const filtered = getFilteredRows();
+    const target = filtered.length !== rows.length && filtered.length > 0
+      ? (confirm('현재 검색된 ' + filtered.length + '건만 내보낼까요?\n[확인] = 검색 결과만\n[취소] = 전체 ' + rows.length + '건') ? filtered : rows)
+      : rows;
+
+    if(target.length === 0){
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+    const exportData = target.map(r => {
+      const o = {};
+      columns.forEach(c => o[c] = r[c] || '');
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '부품리스트');
+    const dateStr = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, '부품데이터_' + dateStr + '.xlsx');
+  });
+
+  // ---- Add / Edit modal ----
+  let editingId = null;
+  const overlay = el('overlay');
+  const modalBody = el('modalBody');
+  const modalTitle = el('modalTitle');
+
+  function openEditModal(id){
+    const r = rows.find(x => x._id === id);
+    if(!r) return;
+    editingId = id;
+    modalTitle.textContent = '데이터 수정';
+    buildModalFields(r);
+    overlay.classList.add('show');
+  }
+
+  function buildModalFields(existing){
+    modalBody.innerHTML = '';
+    columns.forEach(col => {
+      const field = document.createElement('div');
+      field.className = 'field';
+      const label = document.createElement('label');
+      label.textContent = col;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = col;
+      input.value = existing[col] || '';
+      if(SELECT_COLUMNS.includes(col)){
+        input.setAttribute('list', datalistId(col));
+      }
+      if(col === MAJOR_COL){
+        input.addEventListener('input', ()=> updateMinorList(input.value));
+      }
+      field.appendChild(label);
+      field.appendChild(input);
+      modalBody.appendChild(field);
+    });
+    updateMinorList(existing[MAJOR_COL]);
+  }
+
+  el('btnTemplate').addEventListener('click', ()=>{
+    if(columns.length === 0){
+      alert('항목이 없어 양식을 만들 수 없습니다.');
+      return;
+    }
+    const ws = XLSX.utils.aoa_to_sheet([columns.slice()]);
+    ws['!cols'] = columns.map(c => ({wch: Math.max(12, c.length + 4)}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '부품리스트');
+    XLSX.writeFile(wb, '데이터추가양식.xlsx');
+  });
+  function closeEditModal(){
+    overlay.classList.remove('show');
+    updateMinorList(filters[MAJOR_COL]);
+  }
+  el('btnCloseModal').addEventListener('click', closeEditModal);
+  el('btnCancelModal').addEventListener('click', closeEditModal);
+
+  el('btnSaveModal').addEventListener('click', ()=>{
+    const inputs = modalBody.querySelectorAll('input');
+    const rec = {};
+    inputs.forEach(inp => rec[inp.name] = inp.value.trim());
+
+    const hasAny = Object.values(rec).some(v => v !== '');
+    if(!hasAny){
+      alert('최소 한 개 이상의 항목을 입력해 주세요.');
+      return;
+    }
+
+    if(editingId){
+      const idx = rows.findIndex(r => r._id === editingId);
+      if(idx > -1) rows[idx] = Object.assign({_id: editingId}, rec);
+    } else {
+      const partNo = (rec['PART NO.'] || '').trim();
+      if(partNo !== '' && rows.some(r => (r['PART NO.'] || '').toString().trim() === partNo)){
+        alert('이미 등록된 PART NO.(' + partNo + ')입니다. 동일한 품번은 신규로 등록할 수 없습니다.\n기존 데이터는 목록의 [수정]으로 변경해 주세요.');
+        return;
+      }
+      rec._id = nextId++;
+      rows.push(rec);
+      addHistory({source: '직접 추가', added: [{partNo: partNo, partName: rec['PART NAME'] || ''}], replaced: [], kept: 0});
+    }
+    saveToStorage();
+    render();
+    overlay.classList.remove('show');
+  });
+
+  // ---- Column management ----
+  const colOverlay = el('colOverlay');
+  const colChips = el('colChips');
+  const colStatus = el('colStatus');
+
+  el('btnColumns').addEventListener('click', ()=>{
+    renderColChips();
+    colStatus.textContent = '';
+    colOverlay.classList.add('show');
+  });
+  el('btnCloseColModal').addEventListener('click', ()=> colOverlay.classList.remove('show'));
+
+  function renderColChips(){
+    colChips.innerHTML = '';
+    columns.forEach(col => {
+      const chip = document.createElement('div');
+      chip.className = 'col-chip';
+      const span = document.createElement('span');
+      span.textContent = col;
+      const btn = document.createElement('button');
+      btn.textContent = '×';
+      btn.title = '항목 삭제';
+      btn.addEventListener('click', ()=>{
+        if(columns.length <= 1){
+          colStatus.textContent = '최소 1개 항목은 남아 있어야 합니다.';
+          colStatus.className = 'status-msg err';
+          return;
+        }
+        if(!confirm('"' + col + '" 항목을 삭제하시겠습니까? 이 항목의 데이터도 함께 사라집니다.')) return;
+        columns = columns.filter(c => c !== col);
+        rows.forEach(r => delete r[col]);
+        delete filters[col];
+        saveToStorage();
+        renderColChips();
+        render();
+      });
+      chip.appendChild(span);
+      chip.appendChild(btn);
+      colChips.appendChild(chip);
+    });
+  }
+
+  el('btnAddCol').addEventListener('click', ()=>{
+    const val = el('newColInput').value.trim();
+    if(!val){
+      colStatus.textContent = '항목명을 입력해 주세요.';
+      colStatus.className = 'status-msg err';
+      return;
+    }
+    if(columns.includes(val)){
+      colStatus.textContent = '이미 존재하는 항목명입니다.';
+      colStatus.className = 'status-msg err';
+      return;
+    }
+    columns.push(val);
+    el('newColInput').value = '';
+    colStatus.textContent = '"' + val + '" 항목이 추가되었습니다.';
+    colStatus.className = 'status-msg';
+    saveToStorage();
+    renderColChips();
+    render();
+  });
+
+  el('newColInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') el('btnAddCol').click();
+  });
+
+  // init
+  loadHistory();
+  loadFromStorage();
+})();
+</script>
+</body>
+</html>
